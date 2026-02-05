@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: devices_db
+    environment:
+      POSTGRES_USER: deviceuser
+      POSTGRES_PASSWORD: devicepass
+      POSTGRES_DB: devices_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deviceuser"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  backend:
+    build: ./backend
+    container_name: device_backend
+    environment:
+      DATABASE_URL: postgresql://deviceuser:devicepass@postgres:5432/devices_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app_network
+    volumes:
+      - ./backend/app:/app/app
+
+  frontend:
+    build: ./frontend
+    container_name: device_frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+    volumes:
+      - ./frontend/src:/app/src
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge
